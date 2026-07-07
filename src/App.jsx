@@ -3,6 +3,7 @@ import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
 import Home from './pages/Home'
 import Placeholder from './pages/Placeholder'
+import TournamentHub from './pages/TournamentHub'
 
 export default function App() {
   return (
@@ -11,15 +12,10 @@ export default function App() {
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route
-            path="/tournaments"
-            element={
-              <Placeholder
-                title="Tournament Hub"
-                description="Overview, rules, fixtures, groups, points table, teams, players, gallery, results, statistics and announcements — for every BEN SPORTS tournament."
-              />
-            }
-          />
+          
+          {/* Real Tournament Hub View swapped in */}
+          <Route path="/tournaments" element={<TournamentHub />} />
+          
           <Route
             path="/teams"
             element={
@@ -55,7 +51,7 @@ export default function App() {
             element={<Placeholder title="Login" description="One login, role-based dashboards for every part of the platform." />}
           />
           <Route
-            path="*"
+            path="/*"
             element={<Placeholder title="Page not found" description="This part of the ground isn't built yet." />}
           />
         </Routes>
