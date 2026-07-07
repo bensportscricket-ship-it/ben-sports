@@ -12,7 +12,7 @@ import ProtectedRoute from './pages/ProtectedRoute'
 
 export default function App() {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100 antialiased">
       <Navbar />
       <main className="flex-1">
         <Routes>
@@ -22,7 +22,7 @@ export default function App() {
           <Route path="/heroes" element={<Heroes />} />
           <Route path="/tournaments" element={<TournamentHub />} />
           
-          {/* Live Scoring View - Strictly protected for Batting Scorer / Super Admins */}
+          {/* Live Scoring Panel - Strictly for Scorer / Team / Super Admins */}
           <Route 
             path="/score" 
             element={
@@ -32,7 +32,7 @@ export default function App() {
             } 
           />
 
-          {/* Team Finance Ledger Dashboard - Strictly for Team Admins & Super Admins */}
+          {/* Team Admin Financial Ledger & QR Setup - Restricted */}
           <Route 
             path="/teams" 
             element={
@@ -42,7 +42,7 @@ export default function App() {
             } 
           />
           
-          {/* Remaining General Placeholders */}
+          {/* Static Layout General Placeholders */}
           <Route
             path="/gallery"
             element={<Placeholder title="Gallery" description="Photos from every match, every ground." />}
