@@ -1,0 +1,7 @@
+[
+  { "id": "teams", "label": "Registered Teams", "value": 42 },
+  { "id": "players", "label": "Active Players", "value": 618 },
+  { "id": "matches", "label": "Matches Played", "value": 214 },
+  { "id": "tournaments", "label": "Tournaments Hosted", "value": 9 },
+  { "id": "runs", "label": "Runs Scored", "value": 48120 }
+]

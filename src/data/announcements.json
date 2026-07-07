@@ -1,0 +1,14 @@
+[
+  {
+    "id": "ann_001",
+    "type": "urgent",
+    "message": "Season 3 fixtures are live. Toss for the opening match is Saturday, 9:00 AM at BEN Ground No. 1.",
+    "publishedAt": "2026-07-05T09:00:00+05:30"
+  },
+  {
+    "id": "ann_002",
+    "type": "info",
+    "message": "Team registrations for the Under-16 Trophy close Friday at 6:00 PM.",
+    "publishedAt": "2026-07-03T12:00:00+05:30"
+  }
+]

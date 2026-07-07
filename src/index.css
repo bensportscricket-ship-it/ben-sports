@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-bg text-ink font-body antialiased;
+    background-image: radial-gradient(circle at 50% -10%, rgba(31, 157, 85, 0.10), transparent 45%);
+  }
+  h1, h2, h3, h4 {
+    @apply font-display;
+  }
+  ::selection {
+    background: rgba(60, 217, 123, 0.35);
+  }
+  :focus-visible {
+    outline: 2px solid #3CD97B;
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .seam-divider {
+    height: 8px;
+    background-image: theme('backgroundImage.seam-repeat');
+    background-repeat: repeat-x;
+    background-position: center;
+    opacity: 0.6;
+  }
+
+  .scoreboard-digit {
+    @apply font-mono text-pitch-bright;
+    text-shadow: 0 0 12px rgba(60, 217, 123, 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

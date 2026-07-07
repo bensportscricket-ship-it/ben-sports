@@ -1,0 +1,27 @@
+[
+  {
+    "id": "tour_2026_season3",
+    "name": "BEN SPORTS Season 3",
+    "tagline": "16 teams. 3 weeks. One trophy.",
+    "status": "upcoming",
+    "startDate": "2026-07-12",
+    "endDate": "2026-08-02",
+    "teamCount": 16,
+    "matchCount": 30,
+    "venue": "BEN Sports Ground, New Delhi",
+    "featured": true,
+    "coverGradient": "from-pitch-dim via-bg-elevated to-bg"
+  },
+  {
+    "id": "tour_2026_u16",
+    "name": "Under-16 Trophy",
+    "tagline": "Where tomorrow's heroes begin.",
+    "status": "registration_open",
+    "startDate": "2026-08-15",
+    "endDate": "2026-08-28",
+    "teamCount": 8,
+    "matchCount": 14,
+    "venue": "BEN Sports Ground, New Delhi",
+    "featured": false
+  }
+]

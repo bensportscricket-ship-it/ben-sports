@@ -1,0 +1,48 @@
+{
+  "primary": [
+    { "label": "Tournaments", "path": "/tournaments" },
+    { "label": "Teams", "path": "/teams" },
+    { "label": "Heroes", "path": "/heroes" },
+    { "label": "Gallery", "path": "/gallery" },
+    { "label": "Shop", "path": "/shop" },
+    { "label": "Contact", "path": "/contact" }
+  ],
+  "quickNav": [
+    {
+      "id": "tournaments",
+      "label": "Tournaments",
+      "path": "/tournaments",
+      "description": "Fixtures, points tables and live results across every BEN SPORTS tournament."
+    },
+    {
+      "id": "teams",
+      "label": "Teams",
+      "path": "/teams",
+      "description": "Squads, captains and season form for every registered team."
+    },
+    {
+      "id": "heroes",
+      "label": "Heroes",
+      "path": "/heroes",
+      "description": "The BEN SPORTS Hall of Fame — most runs, wickets, catches and more."
+    },
+    {
+      "id": "gallery",
+      "label": "Gallery",
+      "path": "/gallery",
+      "description": "Match-day photos and moments from every ground."
+    },
+    {
+      "id": "shop",
+      "label": "Shop",
+      "path": "/shop",
+      "description": "Official jerseys, caps and accessories."
+    },
+    {
+      "id": "contact",
+      "label": "Contact",
+      "path": "/contact",
+      "description": "Reach the organizing committee for entries and partnerships."
+    }
+  ]
+}
