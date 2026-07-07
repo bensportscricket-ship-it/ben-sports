@@ -7,6 +7,8 @@ import TournamentHub from './pages/TournamentHub'
 import LiveScoring from './pages/LiveScoring'
 import TeamFinance from './pages/TeamFinance'
 import Heroes from './pages/Heroes'
+import Login from './pages/Login'
+import ProtectedRoute from './pages/ProtectedRoute'
 
 export default function App() {
   return (
@@ -14,46 +16,45 @@ export default function App() {
       <Navbar />
       <main className="flex-1">
         <Routes>
-          {/* Public Landing View */}
+          {/* Public Open Views */}
           <Route path="/" element={<Home />} />
-          
-          {/* Active & Automated Tournament Pools */}
-          <Route path="/tournaments" element={<TournamentHub />} />
-
-          {/* Interactive Tap-to-Score Application Panel */}
-          <Route path="/score" element={<LiveScoring />} />
-
-          {/* Team Management & Admin Ledger Dashboard */}
-          <Route path="/teams" element={<TeamFinance />} />
-          
-          {/* The Cric-Logic Hall of Fame Dashboard */}
+          <Route path="/login" element={<Login />} />
           <Route path="/heroes" element={<Heroes />} />
+          <Route path="/tournaments" element={<TournamentHub />} />
           
-          {/* Public Match & Event Galleries */}
+          {/* Live Scoring View - Strictly protected for Batting Scorer / Super Admins */}
+          <Route 
+            path="/score" 
+            element={
+              <ProtectedRoute allowedRoles={['super_admin', 'team_admin']}>
+                <LiveScoring />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Team Finance Ledger Dashboard - Strictly for Team Admins & Super Admins */}
+          <Route 
+            path="/teams" 
+            element={
+              <ProtectedRoute allowedRoles={['super_admin', 'team_admin']}>
+                <TeamFinance />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Remaining General Placeholders */}
           <Route
             path="/gallery"
             element={<Placeholder title="Gallery" description="Photos from every match, every ground." />}
           />
-          
-          {/* Super Admin Managed E-Commerce storefront with Reviews */}
           <Route
             path="/shop"
             element={<Placeholder title="BEN SPORTS Shop" description="Official jerseys, gear, and merchandise with real-time community reviews." />}
           />
-          
-          {/* Support and Organizing Committee Point of Contact */}
           <Route
             path="/contact"
             element={<Placeholder title="Contact Committee" description="Reach the BEN SPORTS organizing committee or register your own external league." />}
           />
-          
-          {/* Unified Role-Based Access Control Login */}
-          <Route
-            path="/login"
-            element={<Placeholder title="Secure Portal Gateway" description="Unified login portal for Super Admins, Team Admins, and Players." />}
-          />
-          
-          {/* Catch-All Route */}
           <Route
             path="/*"
             element={<Placeholder title="Page not found" description="This part of the ground isn't built yet." />}
