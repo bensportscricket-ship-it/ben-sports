@@ -9,6 +9,7 @@ import TeamFinance from './pages/TeamFinance'
 import Heroes from './pages/Heroes'
 import Login from './pages/Login'
 import ProtectedRoute from './pages/ProtectedRoute'
+import Shop from './pages/Shop'
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/heroes" element={<Heroes />} />
           <Route path="/tournaments" element={<TournamentHub />} />
+          <Route path="/shop" element={<Shop />} />
           
           {/* Live Scoring Panel - Strictly for Scorer / Team / Super Admins */}
           <Route 
@@ -46,10 +48,6 @@ export default function App() {
           <Route
             path="/gallery"
             element={<Placeholder title="Gallery" description="Photos from every match, every ground." />}
-          />
-          <Route
-            path="/shop"
-            element={<Placeholder title="BEN SPORTS Shop" description="Official jerseys, gear, and merchandise with real-time community reviews." />}
           />
           <Route
             path="/contact"
