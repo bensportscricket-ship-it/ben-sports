@@ -6,6 +6,7 @@ import Placeholder from './pages/Placeholder'
 import TournamentHub from './pages/TournamentHub'
 import LiveScoring from './pages/LiveScoring'
 import TeamFinance from './pages/TeamFinance'
+import Heroes from './pages/Heroes'
 
 export default function App() {
   return (
@@ -26,15 +27,7 @@ export default function App() {
           <Route path="/teams" element={<TeamFinance />} />
           
           {/* The Cric-Logic Hall of Fame Dashboard */}
-          <Route
-            path="/heroes"
-            element={
-              <Placeholder
-                title="Heroes Leaderboard"
-                description="The ultimate leaderboard. Automatic stat trackers for most runs, wickets, and catches mixed with Super Admin curated honors."
-              />
-            }
-          />
+          <Route path="/heroes" element={<Heroes />} />
           
           {/* Public Match & Event Galleries */}
           <Route
