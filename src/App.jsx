@@ -1,4 +1,3 @@
-
 import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
@@ -11,56 +10,54 @@ import Heroes from './pages/Heroes'
 import Login from './pages/Login'
 import ProtectedRoute from './pages/ProtectedRoute'
 import Shop from './pages/Shop'
+import Contact from './pages/Contact'
 
 export default function App() {
-	return (
-		<div className="flex min-h-screen flex-col bg-slate-950 text-slate-100 antialiased">
-			<Navbar />
-			<main className="flex-1">
-				<Routes>
-					{/* Public Open Views */}
-					<Route path="/" element={<Home />} />
-					<Route path="/login" element={<Login />} />
-					<Route path="/heroes" element={<Heroes />} />
-					<Route path="/tournaments" element={<TournamentHub />} />
-					<Route path="/shop" element={<Shop />} />
+  return (
+    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100 antialiased">
+      <Navbar />
+      <main className="flex-1">
+        <Routes>
+          {/* Public Open Views */}
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/heroes" element={<Heroes />} />
+          <Route path="/tournaments" element={<TournamentHub />} />
+          <Route path="/shop" element={<Shop />} />
+          <Route path="/contact" element={<Contact />} />
           
-					{/* Live Scoring Panel - Strictly for Scorer / Team / Super Admins */}
-					<Route 
-						path="/score" 
-						element={
-							<ProtectedRoute allowedRoles={['super_admin', 'team_admin']}>
-								<LiveScoring />
-							</ProtectedRoute>
-						} 
-					/>
+          {/* Live Scoring Panel - Strictly for Scorer / Team / Super Admins */}
+          <Route 
+            path="/score" 
+            element={
+              <ProtectedRoute allowedRoles={['super_admin', 'team_admin']}>
+                <LiveScoring />
+              </ProtectedRoute>
+            } 
+          />
 
-					{/* Team Admin Financial Ledger & QR Setup - Restricted */}
-					<Route 
-						path="/teams" 
-						element={
-							<ProtectedRoute allowedRoles={['super_admin', 'team_admin']}>
-								<TeamFinance />
-							</ProtectedRoute>
-						} 
-					/>
+          {/* Team Admin Financial Ledger & QR Setup - Restricted */}
+          <Route 
+            path="/teams" 
+            element={
+              <ProtectedRoute allowedRoles={['super_admin', 'team_admin']}>
+                <TeamFinance />
+              </ProtectedRoute>
+            } 
+          />
           
-					{/* Static Layout General Placeholders */}
-					<Route
-						path="/gallery"
-						element={<Placeholder title="Gallery" description="Photos from every match, every ground." />}
-					/>
-					<Route
-						path="/contact"
-						element={<Placeholder title="Contact Committee" description="Reach the BEN SPORTS organizing committee or register your own external league." />}
-					/>
-					<Route
-						path="/*"
-						element={<Placeholder title="Page not found" description="This part of the ground isn't built yet." />}
-					/>
-				</Routes>
-			</main>
-			<Footer />
-		</div>
-	)
+          {/* Static Layout General Placeholders */}
+          <Route
+            path="/gallery"
+            element={<Placeholder title="Gallery" description="Photos from every match, every ground." />}
+          />
+          <Route
+            path="/*"
+            element={<Placeholder title="Page not found" description="This part of the ground isn't built yet." />}
+          />
+        </Routes>
+      </main>
+      <Footer />
+    </div>
+  )
 }
