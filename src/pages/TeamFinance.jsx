@@ -1,154 +1,173 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabaseClient';
 
 export default function TeamFinance() {
-  // Mock Roster Data for Fee Tracking
-  const [players, setPlayers] = useState([
-    { id: 1, name: "Aradhya Sharma", role: "All-Rounder (Capt)", fee: 500, paid: true, date: "2026-07-05" },
-    { id: 2, name: "Rahul Singh", role: "Opening Batsman", fee: 500, paid: false, date: "-" },
-    { id: 3, name: "Amit Patel", role: "Wicketkeeper", fee: 500, paid: true, date: "2026-07-06" },
-    { id: 4, name: "Deepak Kumar", role: "Fast Bowler", fee: 500, paid: false, date: "-" },
-    { id: 5, name: "Vikram Malhotra", role: "Spinner", fee: 500, paid: false, date: "-" },
-  ]);
+  const [teams, setTeams] = useState([]);
+  const [selectedTeam, setSelectedTeam] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Ledger modification inputs
+  const [collected, setCollected] = useState('');
+  const [pending, setPending] = useState('');
+  const [qrUrl, setQrUrl] = useState('');
+  const [updating, setUpdating] = useState(false);
 
-  // QR Code State
-  const [qrImage, setQrImage] = useState(null);
+  useEffect(() => {
+    fetchRegisteredTeams();
+  }, []);
 
-  // Toggle Paid/Unpaid Status
-  const handleTogglePaid = (id) => {
-    setPlayers(prevPlayers =>
-      prevPlayers.map(player => {
-        if (player.id === id) {
-          const newPaidStatus = !player.paid;
-          return {
-            ...player,
-            paid: newPaidStatus,
-            date: newPaidStatus ? new Date().toISOString().split('T')[0] : "-"
-          };
-        }
-        return player;
-      })
-    );
-  };
+  const fetchRegisteredTeams = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('teams')
+        .select('*')
+        .order('team_name', { ascending: true });
 
-  // Handle QR Code Upload
-  const handleQrUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setQrImage(URL.createObjectURL(file));
+      if (error) throw error;
+      setTeams(data || []);
+    } catch (err) {
+      console.error('Error fetching league teams registry:', err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Financial Summaries
-  const totalCollected = players.filter(p => p.paid).reduce((sum, p) => sum + p.fee, 0);
-  const totalPending = players.filter(p => !p.paid).reduce((sum, p) => sum + p.fee, 0);
+  const handleSelectTeam = (team) => {
+    setSelectedTeam(team);
+    setCollected(team.fees_collected || '0');
+    setPending(team.fees_pending || '0');
+    setQrUrl(team.upi_qr_url || '');
+  };
+
+  const handleUpdateFinance = async (e) => {
+    e.preventDefault();
+    if (!selectedTeam) return;
+
+    setUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .update({
+          fees_collected: parseFloat(collected) || 0,
+          fees_pending: parseFloat(pending) || 0,
+          upi_qr_url: qrUrl
+        })
+        .eq('id', selectedTeam.id);
+
+      if (error) throw error;
+
+      // Update local state copy instantly
+      setTeams(teams.map(t => 
+        t.id === selectedTeam.id 
+          ? { ...t, fees_collected: parseFloat(collected) || 0, fees_pending: parseFloat(pending) || 0, upi_qr_url: qrUrl } 
+          : t
+      ));
+
+      alert('Team ledger metrics and payment configurations broadcasted successfully!');
+    } catch (err) {
+      console.error('Ledger write error:', err.message);
+      alert('Failed to update cloud financial systems.');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-4 md:p-12">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Left Column: Management & QR Settings */}
-        <div className="space-y-6 lg:col-span-1">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <h2 className="text-xl font-bold text-emerald-400 mb-2">Team Admin Ledger</h2>
-            <p className="text-slate-400 text-xs leading-relaxed">
-              Upload your payment QR code. Team members can scan to pay directly into your account, and you can record payments below.
-            </p>
+      <div className="max-w-5xl mx-auto space-y-8">
+        <div>
+          <h1 className="text-3xl font-extrabold text-emerald-400 tracking-tight">Team Management & Ledgers</h1>
+          <p className="text-slate-400 text-sm mt-1">Configure individual club fee sheets, monitor collection goals, and provide active payment routers for players.</p>
+        </div>
+
+        {loading ? (
+          <div className="text-slate-500 italic text-xs">Accessing central financial vaults...</div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            {/* QR Scanner Upload Area */}
-            <div className="mt-6 border-2 border-dashed border-slate-800 hover:border-emerald-500/40 rounded-xl p-6 text-center transition-colors bg-slate-950/40 relative">
-              {qrImage ? (
-                <div className="flex flex-col items-center">
-                  <img src={qrImage} alt="Team QR" className="w-40 h-40 object-contain rounded-lg border border-slate-800 p-2 bg-white" />
-                  <button 
-                    onClick={() => setQrImage(null)}
-                    className="mt-3 text-xs font-bold text-red-400 hover:underline"
+            {/* Left Column: Team Selection Menu */}
+            <div className="lg:col-span-1 space-y-4">
+              <h2 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Registered Clubs</h2>
+              {teams.length === 0 ? (
+                <div className="text-xs text-slate-600 border border-slate-900 rounded-xl p-4">No clubs registered in tournament schema.</div>
+              ) : (
+                teams.map((club) => (
+                  <button
+                    key={club.id}
+                    onClick={() => handleSelectTeam(club)}
+                    className={`w-full text-left p-4 rounded-xl border transition-all flex flex-col gap-1.5 ${
+                      selectedTeam?.id === club.id 
+                        ? 'bg-emerald-950/40 border-emerald-500 text-white' 
+                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                    }`}
                   >
-                    Remove QR Code
+                    <div className="font-bold text-sm tracking-tight">{club.team_name}</div>
+                    <div className="flex gap-4 text-[10px] text-slate-400 font-mono mt-0.5">
+                      <div>Paid: <span className="text-emerald-400 font-bold">₹{club.fees_collected}</span></div>
+                      <div>Due: <span className="text-amber-400 font-bold">₹{club.fees_pending}</span></div>
+                    </div>
                   </button>
+                ))
+              )}
+            </div>
+
+            {/* Right Column: Financial Modification Toolkit */}
+            <div className="lg:col-span-2">
+              {selectedTeam ? (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl">
+                  <div>
+                    <span className="text-[10px] font-black tracking-widest uppercase text-emerald-400 block mb-1">Administrative Financial Module</span>
+                    <h2 className="text-xl font-black text-slate-100">{selectedTeam.team_name} Dashboard</h2>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">Manage player transaction records and upload payment gateways below.</p>
+                  </div>
+
+                  <form onSubmit={handleUpdateFinance} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Collected Tournament Fees (INR)</label>
+                        <input
+                          type="number" required value={collected} onChange={(e) => setCollected(e.target.value)} placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-mono font-bold text-emerald-400 focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Pending Balance Due (INR)</label>
+                        <input
+                          type="number" required value={pending} onChange={(e) => setPending(e.target.value)} placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-mono font-bold text-amber-400 focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">UPI Payment Gateway / QR Code Image Link</label>
+                      <input
+                        type="url" value={qrUrl} onChange={(e) => setQrUrl(e.target.value)} placeholder="https://example-storage.com/your-upi-qr.jpg"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none font-mono"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">Paste a web URL pointing to your club's registration payment barcode sticker.</p>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-800/60 flex justify-end">
+                      <button
+                        type="submit" disabled={updating}
+                        className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 text-slate-950 font-black text-xs uppercase tracking-wider px-6 py-3 rounded-xl transition-all shadow-lg"
+                      >
+                        {updating ? 'Saving Changes...' : 'Save Roster Balance Sheet'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               ) : (
-                <div>
-                  <span className="text-3xl">📸</span>
-                  <p className="text-sm font-semibold mt-2 text-slate-300">Upload Team UPI QR</p>
-                  <p className="text-xs text-slate-500 mt-1">GPay, PhonePe, or Paytm screenshot</p>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handleQrUpload} 
-                    className="absolute inset-0 opacity-0 cursor-pointer" 
-                  />
+                <div className="border border-dashed border-slate-800 rounded-2xl p-12 text-center text-slate-500 text-sm h-full flex flex-col justify-center items-center">
+                  Select an active club from the registry directory row block to view and modify its financial profile.
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Quick Metrics Cards */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Collection Summary</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <p className="text-xs text-emerald-400 font-medium">Collected</p>
-                <p className="text-xl font-black mt-1">₹{totalCollected}</p>
-              </div>
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <p className="text-xs text-amber-400 font-medium">Pending</p>
-                <p className="text-xl font-black mt-1">₹{totalPending}</p>
-              </div>
-            </div>
           </div>
-        </div>
-
-        {/* Right Column: Player Fee Roster Table */}
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h3 className="text-lg font-bold text-slate-200">Squad Fee Roster</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Track tournament registration dues per player</p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-slate-800 text-slate-400 font-medium text-xs uppercase tracking-wider">
-                  <th className="pb-3">Player Details</th>
-                  <th className="pb-3 text-center">Amount</th>
-                  <th className="pb-3 text-center">Status</th>
-                  <th className="pb-3 text-right">Cleared Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {players.map((player) => (
-                  <tr key={player.id} className="hover:bg-slate-950/20 transition-colors">
-                    <td className="py-4">
-                      <p className="font-bold text-slate-200">{player.name}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{player.role}</p>
-                    </td>
-                    <td className="py-4 text-center font-semibold text-slate-300">
-                      ₹{player.fee}
-                    </td>
-                    <td className="py-4 text-center">
-                      <button
-                        onClick={() => handleTogglePaid(player.id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                          player.paid 
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                        }`}
-                      >
-                        {player.paid ? '🟢 Paid' : '🟡 Unpaid'}
-                      </button>
-                    </td>
-                    <td className="py-4 text-right text-xs text-slate-500 font-mono">
-                      {player.date}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
+        )}
       </div>
     </div>
   );
