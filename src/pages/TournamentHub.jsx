@@ -1,130 +1,225 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabaseClient';
 
-export default function TournamentHub() {
-  // Mock registration tracking pool
-  const [registeredTeams, setRegisteredTeams] = useState([
-    "BEN 11", "Star Strikers", "Royal Challengers", "Super Kings", 
-    "Titan Giants", "Matrix Masters", "Delta Warriors", "Apex Legends"
-  ]);
+export default function Tournaments() {
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [teams, setTeams] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Automated algorithmic pooling allocation states
-  const [pools, setPools] = useState({ poolA: [], poolB: [] });
-  const [fixtures, setFixtures] = useState([]);
-  const [isGenerated, setIsGenerated] = useState(false);
+  // Pool Configuration State
+  const [groupType, setGroupType] = useState('single'); // 'single' or 'multiple'
+  const [generating, setGenerating] = useState(false);
 
-  // Core Pooling Generator Algorithm
-  const handleGeneratePoolsAndFixtures = () => {
-    // 1. Shuffle teams randomly for unbiased allocation
-    const shuffled = [...registeredTeams].sort(() => 0.5 - Math.random());
-    
-    // 2. Split into two balanced groups (Pool A & Pool B)
-    const midIdx = Math.ceil(shuffled.length / 2);
-    const poolA = shuffled.slice(0, midIdx);
-    const poolB = shuffled.slice(midIdx);
+  // Inline editing state to track which match is being updated manually
+  const [editingMatchId, setEditingMatchId] = useState(null);
+  const [manualTime, setManualTime] = useState('');
+  const [manualVenue, setManualVenue] = useState('');
+  const [savingMatch, setSavingMatch] = useState(false);
 
-    setPools({ poolA, poolB });
+  useEffect(() => {
+    checkAdminAndFetch();
+  }, []);
 
-    // 3. Generate initial Opening Round-Robin Fixture Slots automatically
-    const generatedFixtures = [
-      { id: 101, round: "Opening Round (Pool A)", matchup: `${poolA[0]} vs ${poolA[1] || 'TBD'}`, venue: "Green Park Ground", time: "09:30 AM" },
-      { id: 102, round: "Opening Round (Pool A)", matchup: `${poolA[2] || 'TBD'} vs ${poolA[3] || 'TBD'}`, venue: "BEN Sports Arena", time: "11:45 AM" },
-      { id: 103, round: "Opening Round (Pool B)", matchup: `${poolB[0]} vs ${poolB[1] || 'TBD'}`, venue: "Green Park Ground", time: "02:00 PM" },
-      { id: 104, round: "Opening Round (Pool B)", matchup: `${poolB[2] || 'TBD'} vs ${poolB[3] || 'TBD'}`, venue: "BEN Sports Arena", time: "04:15 PM" }
-    ];
+  const checkAdminAndFetch = async () => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('uuid', user.id).single();
+        if (profile?.role === 'super_admin') setIsAdmin(true);
+      }
 
-    setFixtures(generatedFixtures);
-    setIsGenerated(true);
+      const { data: teamData } = await supabase.from('teams').select('*');
+      setTeams(teamData || []);
+
+      const { data: matchData } = await supabase.from('fixtures').select('*').order('id', { ascending: true });
+      setMatches(matchData || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ⚡ GENERATE POOLS AUTOMATICALLY
+  const handleGeneratePools = async () => {
+    if (teams.length < 2) {
+      alert('You need at least 2 registered teams to create pools!');
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      // Clear out old fixtures
+      await supabase.from('fixtures').delete().neq('id', 0);
+
+      let newMatches = [];
+
+      if (groupType === 'single') {
+        for (let i = 0; i < teams.length; i++) {
+          for (let j = i + 1; j < teams.length; j++) {
+            newMatches.push({
+              team_a: teams[i].team_name,
+              team_b: teams[j].team_name,
+              venue: 'Ground Not Assigned', // 🕒 Left placeholder for manual assignment
+              match_time: 'Time Not Set',   // 🕒 Left placeholder for manual assignment
+              group_pool: 'Group Stage',
+              status: 'scheduled'
+            });
+          }
+        }
+      } else {
+        const poolA = teams.slice(0, Math.ceil(teams.length / 2));
+        const poolB = teams.slice(Math.ceil(teams.length / 2));
+
+        for (let i = 0; i < poolA.length; i++) {
+          for (let j = i + 1; j < poolA.length; j++) {
+            newMatches.push({ team_a: poolA[i].team_name, team_b: poolA[j].team_name, venue: 'Ground Not Assigned', match_time: 'Time Not Set', group_pool: 'Pool A', status: 'scheduled' });
+          }
+        }
+        for (let i = 0; i < poolB.length; i++) {
+          for (let j = i + 1; j < poolB.length; j++) {
+            newMatches.push({ team_a: poolB[i].team_name, team_b: poolB[j].team_name, venue: 'Ground Not Assigned', match_time: 'Time Not Set', group_pool: 'Pool B', status: 'scheduled' });
+          }
+        }
+      }
+
+      const { data, error } = await supabase.from('fixtures').insert(newMatches).select();
+      if (error) throw error;
+
+      setMatches(data || []);
+      alert('Pools generated successfully! You can now assign times and grounds manually below.');
+    } catch (err) {
+      alert(`Generation failed: ${err.message}`);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // ✍️ MANUALLY SAVE TIME & GROUND FOR A MATCH FROM THE WEBSITE UI
+  const startEditing = (match) => {
+    setEditingMatchId(match.id);
+    setManualTime(match.match_time === 'Time Not Set' ? '' : match.match_time);
+    setManualVenue(match.match_type === 'Ground Not Assigned' ? '' : match.venue);
+  };
+
+  const handleSaveManualSchedule = async (matchId) => {
+    setSavingMatch(true);
+    try {
+      const { error } = await supabase
+        .from('fixtures')
+        .update({
+          match_time: manualTime || 'Time Not Set',
+          venue: manualVenue || 'Ground Not Assigned'
+        })
+        .eq('id', matchId);
+
+      if (error) throw error;
+
+      setMatches(matches.map(m => m.id === matchId ? { ...m, match_time: manualTime || 'Time Not Set', venue: manualVenue || 'Ground Not Assigned' } : m));
+      setEditingMatchId(null);
+    } catch (err) {
+      alert('Failed to save schedule changes.');
+    } finally {
+      setSavingMatch(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-4 md:p-12">
-      <div className="max-w-6xl mx-auto space-y-10">
-        
-        {/* Header Dashboard section */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-slate-800 pb-6 gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold text-emerald-400 tracking-tight">Tournament Pool Hub</h1>
-            <p className="text-slate-400 text-sm mt-1">Algorithmic group generation, round-robin setups, and match card draws.</p>
-          </div>
-          <button
-            onClick={handleGeneratePoolsAndFixtures}
-            className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs px-5 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/10 uppercase tracking-wider self-start sm:self-center"
-          >
-            🔄 Auto-Generate Pools & Matches
-          </button>
+      <div className="max-w-5xl mx-auto space-y-8">
+        <div>
+          <h1 className="text-3xl font-extrabold text-emerald-400">Tournament Brackets & Scheduling</h1>
+          <p className="text-slate-400 text-sm mt-1">Generate groups automatically, then assign matching times and grounds manually right from the tool layout.</p>
         </div>
 
-        {/* Dynamic Display Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Column 1: Registered Pool Track */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl h-fit">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
-              📋 Registered Teams ({registeredTeams.length})
-            </h2>
-            <div className="space-y-2">
-              {registeredTeams.map((team, idx) => (
-                <div key={idx} className="bg-slate-950/60 border border-slate-800/50 px-4 py-3 rounded-xl text-sm font-semibold text-slate-300">
-                  {team}
+        {/* Pool Sorter Setup Form */}
+        {isAdmin && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row gap-4 items-end shadow-xl">
+            <div className="flex-1 w-full">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Select Pool Structure Format</label>
+              <select 
+                value={groupType} onChange={(e) => setGroupType(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none"
+              >
+                <option value="single">Single Group (All Teams in 1 Bracket)</option>
+                <option value="multiple">Multiple Groups (Split into Pool A & Pool B)</option>
+              </select>
+            </div>
+            <button
+              onClick={handleGeneratePools} disabled={generating}
+              className="w-full md:w-auto bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 text-slate-950 font-black text-xs uppercase tracking-wider py-3.5 px-8 rounded-xl transition-all shadow-lg whitespace-nowrap"
+            >
+              {generating ? 'Sorting...' : '⚡ Step 1: Auto-Generate Pools'}
+            </button>
+          </div>
+        )}
+
+        {/* Generated Fixtures List with Inline Tools */}
+        <div className="space-y-4">
+          <h2 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Matches & Fixtures Directory ({matches.length})</h2>
+          {matches.length === 0 ? (
+            <div className="text-center border border-slate-900 rounded-2xl p-12 text-slate-500 text-sm">
+              No pools generated yet. Choose a format type above and click generate.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {matches.map((match) => (
+                <div key={match.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] px-2 py-0.5 bg-slate-950 rounded border border-slate-800 text-emerald-400 font-bold tracking-wide uppercase">{match.group_pool}</span>
+                    {isAdmin && editingMatchId !== match.id && (
+                      <button 
+                        onClick={() => startEditing(match)}
+                        className="text-[10px] text-emerald-400 font-bold hover:underline"
+                      >
+                        ✏️ Assign Schedule
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center text-sm font-bold">
+                    <span className="text-slate-200">{match.team_a}</span>
+                    <span className="text-xs text-slate-600 font-normal">VS</span>
+                    <span className="text-slate-200">{match.team_b}</span>
+                  </div>
+
+                  {/* Manual Assignment Form Controls */}
+                  <div className="border-t border-slate-800/60 pt-3">
+                    {editingMatchId === match.id ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <input 
+                            type="text" value={manualTime} onChange={(e) => setManualTime(e.target.value)} placeholder="Time (e.g. 9 AM, Sun)"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                          />
+                          <input 
+                            type="text" value={manualVenue} onChange={(e) => setManualVenue(e.target.value)} placeholder="Ground Name"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => setEditingMatchId(null)} className="text-[10px] uppercase text-slate-400 px-2 py-1">Cancel</button>
+                          <button 
+                            onClick={() => handleSaveManualSchedule(match.id)} disabled={savingMatch}
+                            className="bg-emerald-500 text-slate-950 font-bold text-[10px] uppercase tracking-wider px-3 py-1 rounded-lg"
+                          >
+                            {savingMatch ? 'Saving...' : 'Save Configuration'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between text-[10px] font-medium text-slate-400 font-mono">
+                        <div className={match.match_time === 'Time Not Set' ? 'text-amber-500/70 font-sans italic' : ''}>🕒 {match.match_time}</div>
+                        <div className={match.venue === 'Ground Not Assigned' ? 'text-amber-500/70 font-sans italic' : ''}>📍 {match.venue}</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Column 2 & 3: Dynamic Grouping Output */}
-          <div className="lg:col-span-2 space-y-8">
-            {!isGenerated ? (
-              <div className="border border-dashed border-slate-800 rounded-2xl p-12 text-center text-slate-500">
-                <p className="text-sm italic">Click the "Auto-Generate" trigger to run round-robin sorting algorithms.</p>
-              </div>
-            ) : (
-              <>
-                {/* Generated Pools Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Pool A Display Card */}
-                  <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-6 shadow-lg">
-                    <span className="text-[10px] font-black tracking-widest uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full">Pool A</span>
-                    <div className="mt-4 space-y-2.5">
-                      {pools.poolA.map((t, i) => (
-                        <p key={i} className="text-sm font-bold text-slate-200 font-mono">⚡ {t}</p>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Pool B Display Card */}
-                  <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-6 shadow-lg">
-                    <span className="text-[10px] font-black tracking-widest uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full">Pool B</span>
-                    <div className="mt-4 space-y-2.5">
-                      {pools.poolB.map((t, i) => (
-                        <p key={i} className="text-sm font-bold text-slate-200 font-mono">⚡ {t}</p>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Generated Fixture Slots List Layout */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-                  <h3 className="text-sm font-bold text-slate-200 mb-4 uppercase tracking-wider">🗓️ Generated Schedule Cards</h3>
-                  <div className="divide-y divide-slate-800/60">
-                    {fixtures.map((match) => (
-                      <div key={match.id} className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{match.round}</span>
-                          <h4 className="text-md font-black text-slate-100 mt-0.5">{match.matchup}</h4>
-                          <p className="text-xs text-slate-400 mt-1">📍 {match.venue}</p>
-                        </div>
-                        <div className="bg-slate-950 px-3.5 py-2 rounded-xl border border-slate-800 text-right self-start sm:self-center">
-                          <p className="text-xs font-black text-emerald-400 font-mono">{match.time}</p>
-                          <p className="text-[9px] text-slate-500 uppercase font-bold tracking-wider mt-0.5">Confirmed Match Slot</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
+          )}
         </div>
 
       </div>
