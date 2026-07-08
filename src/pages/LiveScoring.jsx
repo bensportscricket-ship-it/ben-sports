@@ -1,190 +1,270 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabaseClient';
 
-export default function Tournaments() {
+export default function LiveScoring() {
   const [isAdmin, setIsAdmin] = useState(false);
-  const [teams, setTeams] = useState([]);
   const [matches, setMatches] = useState([]);
+  const [selectedMatch, setSelectedMatch] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 🎛️ NEW CONFIGURATION STATES FOR THE UI
-  const [venue, setVenue] = useState('Main Cricket Ground, Delhi');
-  const [matchTime, setMatchTime] = useState('10:00 AM');
-  const [groupType, setGroupType] = useState('single'); // 'single' (All in one) or 'multiple' (Pool A, Pool B)
-  const [generating, setGenerating] = useState(false);
+  // Live Score Tracking States
+  const [runs, setRuns] = useState(0);
+  const [wickets, setWickets] = useState(0);
+  const [overs, setOvers] = useState('0.0');
+  const [target, setTarget] = useState('');
+  const [currentInnings, setCurrentInnings] = useState('Team A'); // or Team B
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
-    checkAdminAndFetch();
+    checkAdminAndFetchMatches();
   }, []);
 
-  const checkAdminAndFetch = async () => {
+  const checkAdminAndFetchMatches = async () => {
     try {
       setLoading(true);
-      // Check if logged in user is admin
+      // Verify admin status
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase.from('profiles').select('role').eq('uuid', user.id).single();
         if (profile?.role === 'super_admin') setIsAdmin(true);
       }
 
-      // Fetch teams to generate matches from
-      const { data: teamData } = await supabase.from('teams').select('*');
-      setTeams(teamData || []);
-
-      // Fetch existing matches
-      const { data: matchData } = await supabase.from('fixtures').select('*').order('id', { ascending: true });
+      // Fetch scheduled or active matches from the database
+      const { data: matchData } = await supabase
+        .from('fixtures')
+        .select('*')
+        .or('status.eq.scheduled,status.eq.live')
+        .order('id', { ascending: true });
+        
       setMatches(matchData || []);
     } catch (err) {
-      console.error(err);
+      console.error('Error syncing match data:', err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // ⚡ GENERATE TOURNAMENT FIXTURES WITH YOUR CUSTOM INPUTS
-  const handleGenerateFixtures = async () => {
-    if (teams.length < 2) {
-      alert('You need at least 2 registered teams to generate a tournament schedule!');
-      return;
-    }
+  const handleSelectMatch = (match) => {
+    setSelectedMatch(match);
+    // Initialize scoring view state based on existing database values or defaults
+    setRuns(match.live_runs || 0);
+    setWickets(match.live_wickets || 0);
+    setOvers(match.live_overs || '0.0');
+    setTarget(match.live_target || '');
+    setCurrentInnings(match.current_batting_team || match.team_a);
+  };
 
-    setGenerating(true);
+  // ⚡ PUSH REAL-TIME MATCH UPDATES TO THE DATABASE
+  const handleUpdateScore = async (statusUpdate = 'live') => {
+    if (!selectedMatch) return;
+    setUpdating(true);
+
     try {
-      // 🗑️ Clear out any old matches first
-      await supabase.from('fixtures').delete().neq('id', 0);
+      const { error } = await supabase
+        .from('fixtures')
+        .update({
+          status: statusUpdate,
+          live_runs: parseInt(runs) || 0,
+          live_wickets: parseInt(wickets) || 0,
+          live_overs: overs,
+          live_target: parseInt(target) || null,
+          current_batting_team: currentInnings
+        })
+        .eq('id', selectedMatch.id);
 
-      let newMatches = [];
-
-      if (groupType === 'single') {
-        // Round Robin: Everyone plays everyone once in a single group
-        for (let i = 0; i < teams.length; i++) {
-          for (let j = i + 1; j < teams.length; j++) {
-            newMatches.push({
-              team_a: teams[i].team_name,
-              team_b: teams[j].team_name,
-              venue: venue,
-              match_time: matchTime,
-              group_pool: 'Group Stage',
-              status: 'scheduled'
-            });
-          }
-        }
-      } else {
-        // Multiple Groups: Split teams into Pool A and Pool B evenly
-        const poolA = teams.slice(0, Math.ceil(teams.length / 2));
-        const poolB = teams.slice(Math.ceil(teams.length / 2));
-
-        // Pool A Matches
-        for (let i = 0; i < poolA.length; i++) {
-          for (let j = i + 1; j < poolA.length; j++) {
-            newMatches.push({ team_a: poolA[i].team_name, team_b: poolA[j].team_name, venue, match_time: matchTime, group_pool: 'Pool A', status: 'scheduled' });
-          }
-        }
-        // Pool B Matches
-        for (let i = 0; i < poolB.length; i++) {
-          for (let j = i + 1; j < poolB.length; j++) {
-            newMatches.push({ team_a: poolB[i].team_name, team_b: poolB[j].team_name, venue, match_time: matchTime, group_pool: 'Pool B', status: 'scheduled' });
-          }
-        }
-      }
-
-      // Bulk save new matches to Supabase
-      const { data, error } = await supabase.from('fixtures').insert(newMatches).select();
       if (error) throw error;
 
-      setMatches(data || []);
-      alert(`Successfully generated ${data.length} matches across your configured framework!`);
+      // Update local state grid array instantly
+      setMatches(matches.map(m => m.id === selectedMatch.id ? { 
+        ...m, 
+        status: statusUpdate,
+        live_runs: parseInt(runs) || 0, 
+        live_wickets: parseInt(wickets) || 0, 
+        live_overs: overs,
+        live_target: parseInt(target) || null,
+        current_batting_team: currentInnings
+      } : m));
+
+      alert(`Match dashboard updated successfully to: ${statusUpdate.toUpperCase()}!`);
     } catch (err) {
-      alert(`Generation failed: ${err.message}`);
+      alert(`Scoring save failed: ${err.message}`);
     } finally {
-      setGenerating(false);
+      setUpdating(false);
     }
   };
 
+  // Quick Scoring Helpers
+  const adjustRuns = (amount) => setRuns(prev => Math.max(0, prev + amount));
+  const adjustWickets = (amount) => setWickets(prev => Math.min(10, Math.max(0, prev + amount)));
+
   return (
     <div className="min-h-screen bg-slate-950 text-white p-4 md:p-12">
-      <div className="max-w-5xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8">
+        
+        {/* Header Block */}
         <div>
-          <h1 className="text-3xl font-extrabold text-emerald-400">Tournament Scheduler</h1>
-          <p className="text-slate-400 text-sm mt-1">Generate schedules, group tiers, and track matchups from the UI.</p>
+          <h1 className="text-3xl font-extrabold text-emerald-400 tracking-tight">Live Scoring Controller</h1>
+          <p className="text-slate-400 text-sm mt-1">Select an active fixture to input ball-by-ball updates directly to the tournament stream feed.</p>
         </div>
 
-        {/* 🛡️ ADMIN SETUP WIDGET ON SITE */}
-        {isAdmin && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-xl">
-            <h2 className="text-sm font-bold uppercase text-emerald-400 tracking-wider">Tournament Settings Configurator</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Group Structure Select */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Group Format Type</label>
-                <select 
-                  value={groupType} onChange={(e) => setGroupType(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none"
-                >
-                  <option value="single">Single Group (All Teams Mix)</option>
-                  <option value="multiple">Multiple Groups (Split to Pool A & B)</option>
-                </select>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Left Side: Match Fixture Selector */}
+          <div className="lg:col-span-1 space-y-4">
+            <h2 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Scheduled Matches</h2>
+            {loading ? (
+              <div className="text-slate-500 text-xs italic">Syncing active match hubs...</div>
+            ) : matches.length === 0 ? (
+              <div className="text-xs text-slate-600 border border-slate-900 rounded-xl p-4">
+                No active or scheduled matches found. Generate pools under the Tournaments section first!
               </div>
-
-              {/* Match Time Input */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Default Match Time / Date</label>
-                <input 
-                  type="text" value={matchTime} onChange={(e) => setMatchTime(e.target.value)} placeholder="e.g. 10:00 AM / Every Sat"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none"
-                />
+            ) : (
+              <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+                {matches.map((match) => (
+                  <button
+                    key={match.id} onClick={() => handleSelectMatch(match)}
+                    className={`w-full text-left p-4 rounded-xl border transition-all space-y-2 flex flex-col ${
+                      selectedMatch?.id === match.id 
+                        ? 'bg-emerald-950/40 border-emerald-500 text-white shadow-lg' 
+                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                    }`}
+                  >
+                    <div className="flex justify-between w-full text-[9px] font-mono font-bold uppercase">
+                      <span className="text-slate-500">📍 {match.venue || 'No Ground Assigned'}</span>
+                      <span className={match.status === 'live' ? 'text-red-400 animate-pulse' : 'text-emerald-400'}>
+                        {match.status}
+                      </span>
+                    </div>
+                    <div className="text-sm font-bold tracking-tight">
+                      {match.team_a} <span className="text-xs text-slate-500 font-normal px-1">vs</span> {match.team_b}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-medium">🕒 {match.match_time || 'Time Not Scheduled'}</div>
+                  </button>
+                ))}
               </div>
-
-              {/* Venue Input */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Default Venue Location</label>
-                <input 
-                  type="text" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Stadium Address..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={handleGenerateFixtures} disabled={generating}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 text-slate-950 font-black text-xs uppercase tracking-wider py-3.5 rounded-xl transition-all shadow-lg"
-            >
-              {generating ? 'Processing Brackets...' : '⚡ Auto-Generate Pools & Matches'}
-            </button>
+            )}
           </div>
-        )}
 
-        {/* FIXTURES DISPLAY LIST */}
-        <div className="space-y-4">
-          <h2 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Generated Matches Schedule ({matches.length})</h2>
-          {matches.length === 0 ? (
-            <div className="text-center border border-slate-900 rounded-2xl p-12 text-slate-500 text-sm">
-              No matches generated yet. Fill out the configuration form above and click generate.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {matches.map((match) => (
-                <div key={match.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[9px] px-2 py-0.5 bg-slate-950 rounded border border-slate-800 text-emerald-400 font-mono font-bold uppercase">{match.group_pool}</span>
-                    <span className="text-[10px] text-slate-500 font-mono font-bold uppercase">{match.status}</span>
+          {/* Right Side: Master Scoring Interface Console */}
+          <div className="lg:col-span-2">
+            {selectedMatch ? (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl">
+                
+                {/* Active Match Matchup Display Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-4">
+                  <div>
+                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block mb-1">Live Feed Interface</span>
+                    <h2 className="text-xl font-black text-slate-100">{selectedMatch.team_a} vs {selectedMatch.team_b}</h2>
+                    <p className="text-xs text-slate-500 font-medium font-mono mt-0.5">Ground: {selectedMatch.venue} | Time: {selectedMatch.match_time}</p>
                   </div>
-                  <div className="flex justify-between items-center py-2 text-sm font-bold">
-                    <span className="text-slate-200">{match.team_a}</span>
-                    <span className="text-xs text-slate-600 font-light px-2">VS</span>
-                    <span className="text-slate-200">{match.team_b}</span>
-                  </div>
-                  <div className="border-t border-slate-800/40 pt-2 flex justify-between text-[10px] text-slate-400 font-medium">
-                    <div>🕒 {match.match_time}</div>
-                    <div>📍 {match.venue}</div>
+                  
+                  {/* Status Action Overrides */}
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleUpdateScore('completed')}
+                      className="bg-slate-950 border border-slate-800 hover:border-red-500/40 hover:text-red-400 text-slate-400 text-[10px] font-bold uppercase tracking-wider px-3 py-2 rounded-xl transition-all"
+                    >
+                      End Match
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
 
+                {/* Score Editing Board (Only accessible by Admins) */}
+                {isAdmin ? (
+                  <div className="space-y-6">
+                    {/* Current Innings Settings Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Current Batting Team</label>
+                        <select 
+                          value={currentInnings} onChange={(e) => setCurrentInnings(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs focus:outline-none focus:border-emerald-500 text-slate-100"
+                        >
+                          <option value={selectedMatch.team_a}>{selectedMatch.team_a}</option>
+                          <option value={selectedMatch.team_b}>{selectedMatch.team_b}</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Target to Win (Optional)</label>
+                        <input 
+                          type="number" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="No Target Assigned"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono font-bold focus:outline-none focus:border-emerald-500 text-slate-200"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Master Counter Buttons Matrix */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      
+                      {/* Runs Interface Panel */}
+                      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4 flex flex-col justify-between">
+                        <div className="text-center">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Runs</span>
+                          <div className="text-5xl font-black text-emerald-400 font-mono mt-1">{runs}</div>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          <button onClick={() => adjustRuns(1)} className="bg-slate-900 hover:bg-slate-800 p-2 text-xs font-bold font-mono rounded-lg border border-slate-800">+1</button>
+                          <button onClick={() => adjustRuns(4)} className="bg-slate-900 hover:bg-slate-800 p-2 text-xs font-bold font-mono rounded-lg border border-slate-800 text-emerald-400">+4</button>
+                          <button onClick={() => adjustRuns(6)} className="bg-slate-900 hover:bg-slate-800 p-2 text-xs font-bold font-mono rounded-lg border border-slate-800 text-amber-400">+6</button>
+                          <button onClick={() => adjustRuns(-1)} className="bg-slate-900 hover:bg-slate-800 p-2 text-xs font-bold font-mono rounded-lg border border-slate-800 text-red-400/70">-1</button>
+                        </div>
+                      </div>
+
+                      {/* Wickets & Overs Input Panel */}
+                      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4 flex flex-col justify-between">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="text-center">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Wickets Down</span>
+                            <div className="text-3xl font-black text-red-400 font-mono mt-1">{wickets}/10</div>
+                            <div className="flex justify-center gap-2 mt-2">
+                              <button onClick={() => adjustWickets(-1)} className="bg-slate-900 p-1 px-2 text-[10px] font-bold rounded-md border border-slate-800">-</button>
+                              <button onClick={() => adjustWickets(1)} className="bg-slate-900 p-1 px-2 text-[10px] font-bold rounded-md border border-slate-800 text-red-400">+</button>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Overs Bowled</label>
+                            <input 
+                              type="text" value={overs} onChange={(e) => setOvers(e.target.value)} placeholder="e.g. 14.2"
+                              className="w-full text-center bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-lg font-mono font-bold focus:outline-none focus:border-emerald-500 text-slate-200"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Master Action Trigger Button */}
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        onClick={() => handleUpdateScore('live')} disabled={updating}
+                        className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 text-slate-950 font-black text-xs uppercase tracking-wider py-3.5 rounded-xl transition-all shadow-lg"
+                      >
+                        {updating ? 'Transmitting Data...' : 'Broadcast Score Updates Live'}
+                      </button>
+                    </div>
+
+                  </div>
+                ) : (
+                  // Viewer Mode for General Registered Members
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-8 text-center space-y-4">
+                    <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">Current Live Standing</div>
+                    <div className="text-3xl font-black text-slate-200">{currentInnings} Innings</div>
+                    <div className="text-5xl font-black text-emerald-400 font-mono tracking-tight">{runs} / {wickets}</div>
+                    <div className="text-sm text-slate-400 font-mono">Overs: <span className="text-slate-200 font-bold">{overs}</span></div>
+                    {target && <div className="text-xs text-amber-400 font-bold">Target Needed to Win: {target} runs</div>}
+                  </div>
+                )}
+
+              </div>
+            ) : (
+              <div className="border border-dashed border-slate-800 rounded-2xl p-12 text-center text-slate-500 text-sm h-full flex flex-col justify-center items-center min-h-[350px]">
+                Select an active matchup card from the sidebar block to update statistics or monitor public stream outputs.
+              </div>
+            )}
+          </div>
+
+        </div>
       </div>
     </div>
   );
