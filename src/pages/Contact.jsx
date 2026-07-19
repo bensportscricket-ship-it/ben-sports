@@ -21,15 +21,15 @@ export default function Contact() {
 		setErrorMessage('');
     
 		try {
-			// Stream the registration request directly into your cloud Supabase 'teams' table
 			const { error } = await supabase
-				.from('teams')
+				.from('contact_messages')
 				.insert([
-					{ 
-						captain_name: formData.name,
-						team_name: formData.teamName || 'Independent Agent',
-						contact_phone: formData.phone,
-						payment_status: 'pending'
+					{
+						name: formData.name,
+						email: formData.email,
+						phone: formData.phone,
+						team_name: formData.teamName || null,
+						message: formData.message,
 					}
 				]);
 
@@ -38,8 +38,8 @@ export default function Contact() {
 			setSubmitted(true);
 			setFormData({ name: '', email: '', phone: '', teamName: '', message: '' });
 		} catch (err) {
-			console.error("Database Injection Error:", err.message);
-			setErrorMessage('Failed to connect to backend storage. Please verify your internet connection.');
+			console.error("Failed to send message:", err.message);
+			setErrorMessage('Something went wrong sending your message. Please try again in a moment.');
 		} finally {
 			setLoading(false);
 		}
@@ -61,7 +61,7 @@ export default function Contact() {
 
 				{submitted && (
 					<div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 rounded-xl text-xs font-bold flex items-center gap-2">
-						✅ Success! Your league registration query has been saved directly to cloud storage.
+						✅ Message sent! The organizing committee will get back to you soon.
 					</div>
 				)}
 
@@ -91,26 +91,26 @@ export default function Contact() {
 							</div>
 
 							<div>
-								<label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Contact Phone Number</label>
+								<label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Contact Phone Number <span className="normal-case font-normal text-slate-500">(optional)</span></label>
 								<input
-									type="tel" required name="phone" value={formData.phone} onChange={handleChange} placeholder="+91 XXXXX XXXXX"
+									type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="+91 XXXXX XXXXX"
 									className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none transition-colors"
 								/>
 							</div>
 
 							<div>
-								<label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Club / Team Name</label>
+								<label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Club / Team Name <span className="normal-case font-normal text-slate-500">(optional)</span></label>
 								<input
-									type="text" required name="teamName" value={formData.teamName} onChange={handleChange} placeholder="e.g., BEN Warriors"
+									type="text" name="teamName" value={formData.teamName} onChange={handleChange} placeholder="e.g., BEN Warriors"
 									className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none transition-colors"
 								/>
 							</div>
 						</div>
 
 						<div>
-							<label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Registration Brief & Message Details</label>
+							<label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Your Message</label>
 							<textarea
-								required rows="4" name="message" value={formData.message} onChange={handleChange} placeholder="Outline your team roster size, ground allocation queries, or external league rules..."
+								required rows="4" name="message" value={formData.message} onChange={handleChange} placeholder="Team roster queries, ground allocation, sponsorships, general questions..."
 								className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none transition-colors resize-none"
 							/>
 						</div>

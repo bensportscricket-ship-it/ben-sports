@@ -1,7 +1,7 @@
 {
   "primary": [
     { "label": "Tournaments", "path": "/tournaments" },
-    { "label": "Teams", "path": "/teams" },
+    { "label": "Register Team", "path": "/register-team" },
     { "label": "Heroes", "path": "/heroes" },
     { "label": "Gallery", "path": "/gallery" },
     { "label": "Shop", "path": "/shop" },
@@ -15,10 +15,10 @@
       "description": "Fixtures, points tables and live results across every BEN SPORTS tournament."
     },
     {
-      "id": "teams",
-      "label": "Teams",
-      "path": "/teams",
-      "description": "Squads, captains and season form for every registered team."
+      "id": "register-team",
+      "label": "Register Team",
+      "path": "/register-team",
+      "description": "Sign your team up for an open tournament in a few minutes."
     },
     {
       "id": "heroes",

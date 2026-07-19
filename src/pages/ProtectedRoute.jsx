@@ -1,17 +1,25 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProtectedRoute({ children, allowedRoles }) {
-  // Grab state from localStorage
-  const userSession = JSON.parse(localStorage.getItem('ben_sports_user'));
+  const { session, role, loading } = useAuth();
 
-  // If no token exists, send them straight away back to the login page
-  if (!userSession || !userSession.token) {
+  if (loading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-400">
+        Checking access...
+      </div>
+    );
+  }
+
+  // No real Supabase session -> not logged in
+  if (!session) {
     return <Navigate to="/login" replace />;
   }
 
-  // If the user's role is not included in the allowed list, bounce them out
-  if (allowedRoles && !allowedRoles.includes(userSession.role)) {
+  // Role is verified from the database (profiles table), never from the client
+  if (allowedRoles && !allowedRoles.includes(role)) {
     return <Navigate to="/" replace />;
   }
 
